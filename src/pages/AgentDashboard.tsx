@@ -27,6 +27,7 @@ const AgentDashboard = () => {
     scheduledCollections: 0,
     completedCollections: 0
   });
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
     if (!user) {
@@ -100,6 +101,13 @@ const AgentDashboard = () => {
     } catch (error) {
       console.error('Error fetching stats:', error);
     }
+  };
+
+  const handleFarmerAdded = () => {
+    // Increment refresh trigger to force FarmersList to refresh
+    setRefreshTrigger(prev => prev + 1);
+    setIsModalOpen(false);
+    fetchStats();
   };
 
   if (loading) {
@@ -207,7 +215,7 @@ const AgentDashboard = () => {
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
           {/* Farmers List */}
           <div>
-            <FarmersList />
+            <FarmersList refreshTrigger={refreshTrigger} />
           </div>
 
           {/* Collection Scheduler */}
@@ -219,10 +227,7 @@ const AgentDashboard = () => {
         <AddFarmerModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
-          onSuccess={() => {
-            setIsModalOpen(false);
-            fetchStats();
-          }}
+          onFarmerAdded={handleFarmerAdded}
         />
       </div>
     </div>

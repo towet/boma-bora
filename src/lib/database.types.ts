@@ -9,37 +9,11 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
-      profiles: {
-        Row: {
-          id: string
-          role: 'farmer' | 'agent'
-          full_name: string
-          location: string
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id: string
-          role: 'farmer' | 'agent'
-          full_name: string
-          location: string
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          role?: 'farmer' | 'agent'
-          full_name?: string
-          location?: string
-          created_at?: string
-          updated_at?: string
-        }
-      }
       farmers: {
         Row: {
           id: string
           full_name: string
-          phone_number: string
+          phone_number: string | null
           location: string
           created_at: string
           created_by: string
@@ -48,7 +22,7 @@ export interface Database {
         Insert: {
           id?: string
           full_name: string
-          phone_number: string
+          phone_number?: string | null
           location: string
           created_at?: string
           created_by: string
@@ -57,10 +31,39 @@ export interface Database {
         Update: {
           id?: string
           full_name?: string
-          phone_number?: string
+          phone_number?: string | null
           location?: string
           created_at?: string
           created_by?: string
+          updated_at?: string
+        }
+      }
+      profiles: {
+        Row: {
+          id: string
+          full_name: string
+          role: 'agent' | 'farmer'
+          phone_number: string | null
+          location: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          full_name: string
+          role: 'agent' | 'farmer'
+          phone_number?: string | null
+          location?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          full_name?: string
+          role?: 'agent' | 'farmer'
+          phone_number?: string | null
+          location?: string | null
+          created_at?: string
           updated_at?: string
         }
       }
@@ -82,9 +85,9 @@ export interface Database {
           farmer_id: string
           scheduled_date: string
           scheduled_time: string
-          quantity_liters?: number
+          quantity_liters?: number | null
           status?: 'scheduled' | 'completed' | 'cancelled'
-          notes?: string
+          notes?: string | null
           created_by: string
           created_at?: string
           updated_at?: string

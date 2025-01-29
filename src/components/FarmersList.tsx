@@ -6,7 +6,11 @@ import { useAuth } from '../contexts/AuthContext';
 
 type Farmer = Database['public']['Tables']['farmers']['Row'];
 
-const FarmersList = () => {
+interface FarmersListProps {
+  refreshTrigger?: number;
+}
+
+const FarmersList = ({ refreshTrigger = 0 }: FarmersListProps) => {
   const { user } = useAuth();
   const [farmers, setFarmers] = useState<Farmer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -14,7 +18,9 @@ const FarmersList = () => {
 
   useEffect(() => {
     fetchFarmers();
+  }, [refreshTrigger]); // Re-fetch when refreshTrigger changes
 
+  useEffect(() => {
     // Subscribe to changes
     const channel = supabase
       .channel('farmers_channel')
