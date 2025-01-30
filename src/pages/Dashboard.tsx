@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Droplet, MessageSquare, TrendingUp } from 'lucide-react';
+import { Calendar, Droplet, MessageSquare, TrendingUp, Megaphone } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import FarmerCollections from '../components/FarmerCollections';
+import Messages from '../components/Messages';
+import Announcements from '../components/Announcements';
 import { Database } from '../lib/database.types';
 
 type Collection = Database['public']['Tables']['collections']['Row'];
@@ -13,11 +15,17 @@ interface Profile {
   full_name: string;
 }
 
+interface AgentInfo {
+  id: string;
+  full_name: string;
+}
+
 const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [agentInfo, setAgentInfo] = useState<AgentInfo | null>(null);
   const [stats, setStats] = useState({
     totalCollections: 0,
     upcomingCollections: 0,
@@ -49,6 +57,7 @@ const Dashboard = () => {
         
         setProfile(data);
         await fetchStats();
+        await fetchAgentInfo();
       } catch (error) {
         console.error('Error fetching profile:', error);
         navigate('/login');
@@ -59,6 +68,81 @@ const Dashboard = () => {
 
     getProfile();
   }, [user, navigate]);
+
+  const fetchAgentInfo = async () => {
+    if (!user) return;
+
+    try {
+      console.log('Current user ID:', user.id);
+      
+      // Try to find the farmer record
+      const { data: farmerData, error: farmerError } = await supabase
+        .from('farmers')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      console.log('Farmer data:', farmerData);
+      console.log('Farmer error:', farmerError);
+
+      if (farmerError) {
+        console.error('Error fetching farmer data:', farmerError);
+        return;
+      }
+
+      if (!farmerData) {
+        // If no farmer found, check if user is in profiles table
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, full_name, role')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        console.log('Profile data:', profileData);
+        
+        if (profileError) {
+          console.error('Error fetching profile:', profileError);
+          return;
+        }
+
+        if (profileData?.role === 'farmer') {
+          // If user is a farmer in profiles but not in farmers table,
+          // we need to add them to farmers table
+          const { data: newFarmer, error: createError } = await supabase
+            .from('farmers')
+            .insert([{ id: user.id }])
+            .select()
+            .single();
+
+          if (createError) {
+            console.error('Error creating farmer record:', createError);
+            return;
+          }
+
+          // No need to continue if we just created the farmer record
+          return;
+        }
+      }
+
+      if (farmerData?.created_by) {
+        // Get the agent's profile information
+        const { data: agentData, error: agentError } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .eq('id', farmerData.created_by)
+          .single();
+
+        if (agentError) {
+          console.error('Error fetching agent data:', agentError);
+          return;
+        }
+
+        setAgentInfo(agentData);
+      }
+    } catch (error) {
+      console.error('Error fetching agent info:', error);
+    }
+  };
 
   const fetchStats = async () => {
     if (!user) return;
@@ -106,100 +190,100 @@ const Dashboard = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Loading...</div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
       </div>
     );
   }
 
-  if (!profile) return null;
-
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Farmer Dashboard</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Welcome, {profile.full_name}. View your milk collection schedule and history.
-          </p>
+    <div className="min-h-screen bg-gray-50">
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-2xl font-bold text-gray-900 mb-8">
+          Welcome, {profile?.full_name}
+        </h1>
 
-          {/* Stats Overview */}
-          <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {/* Total Collections */}
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <Calendar className="h-6 w-6 text-gray-400" />
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Total Collections</dt>
-                      <dd className="text-lg font-medium text-gray-900">{stats.totalCollections}</dd>
-                    </dl>
-                  </div>
-                </div>
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="flex items-center">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Calendar className="h-6 w-6 text-blue-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Total Collections</p>
+                <p className="text-2xl font-semibold text-gray-900">{stats.totalCollections}</p>
               </div>
             </div>
+          </div>
 
-            {/* Upcoming Collections */}
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <Calendar className="h-6 w-6 text-gray-400" />
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Upcoming Collections</dt>
-                      <dd className="text-lg font-medium text-gray-900">{stats.upcomingCollections}</dd>
-                    </dl>
-                  </div>
-                </div>
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="flex items-center">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <Calendar className="h-6 w-6 text-green-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Upcoming Collections</p>
+                <p className="text-2xl font-semibold text-gray-900">{stats.upcomingCollections}</p>
               </div>
             </div>
+          </div>
 
-            {/* Total Liters */}
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <Droplet className="h-6 w-6 text-gray-400" />
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Total Liters</dt>
-                      <dd className="text-lg font-medium text-gray-900">
-                        {stats.totalLiters.toFixed(1)} L
-                      </dd>
-                    </dl>
-                  </div>
-                </div>
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="flex items-center">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <Droplet className="h-6 w-6 text-purple-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Total Liters</p>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {stats.totalLiters.toFixed(1)}L
+                </p>
               </div>
             </div>
+          </div>
 
-            {/* Average per Collection */}
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <TrendingUp className="h-6 w-6 text-gray-400" />
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Average per Collection</dt>
-                      <dd className="text-lg font-medium text-gray-900">
-                        {stats.averageLiters.toFixed(1)} L
-                      </dd>
-                    </dl>
-                  </div>
-                </div>
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="flex items-center">
+              <div className="p-2 bg-yellow-100 rounded-lg">
+                <TrendingUp className="h-6 w-6 text-yellow-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Average Liters</p>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {stats.averageLiters.toFixed(1)}L
+                </p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Collections List */}
-        <FarmerCollections />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Collections Section */}
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Collection Schedule</h2>
+            <FarmerCollections />
+          </div>
+
+          {/* Communication Section */}
+          <div className="space-y-8">
+            {/* Announcements */}
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Announcements</h2>
+              <Announcements />
+            </div>
+
+            {/* Messages */}
+            {agentInfo && (
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">Messages</h2>
+                <Messages receiverId={agentInfo.id} receiverName={agentInfo.full_name} />
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, Plus, X } from 'lucide-react';
+import { Calendar, Clock, Plus, X, Droplet } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Database } from '../lib/database.types';
+import CollectionRecorder from './CollectionRecorder';
 
-type Collection = Database['public']['Tables']['collections']['Row'];
+type Collection = Database['public']['Tables']['collections']['Row'] & {
+  farmers: { full_name: string };
+};
 type Farmer = Database['public']['Tables']['farmers']['Row'];
 
 interface ScheduleModalProps {
@@ -158,6 +161,7 @@ const CollectionScheduler = () => {
   const [loading, setLoading] = useState(true);
   const [selectedFarmer, setSelectedFarmer] = useState<Farmer | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'upcoming' | 'completed'>('upcoming');
 
   useEffect(() => {
     fetchFarmers();
@@ -226,6 +230,12 @@ const CollectionScheduler = () => {
     });
   };
 
+  const upcomingCollections = collections.filter(
+    (c) => c.status === 'scheduled' && new Date(`${c.scheduled_date}T${c.scheduled_time}`) > new Date()
+  );
+
+  const completedCollections = collections.filter((c) => c.status === 'completed');
+
   if (loading) {
     return <div className="text-center py-4">Loading schedules...</div>;
   }
@@ -245,44 +255,95 @@ const CollectionScheduler = () => {
         </div>
       </div>
 
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex">
+          <button
+            onClick={() => setActiveTab('upcoming')}
+            className={`${
+              activeTab === 'upcoming'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            } flex-1 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-center`}
+          >
+            Upcoming Collections
+          </button>
+          <button
+            onClick={() => setActiveTab('completed')}
+            className={`${
+              activeTab === 'completed'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            } flex-1 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-center`}
+          >
+            Completed Collections
+          </button>
+        </nav>
+      </div>
+
       <div className="p-6">
         <div className="space-y-4">
-          {collections.length === 0 ? (
-            <p className="text-center text-gray-500 py-4">No collections scheduled.</p>
+          {activeTab === 'upcoming' ? (
+            upcomingCollections.length === 0 ? (
+              <p className="text-center text-gray-500 py-4">No collections scheduled.</p>
+            ) : (
+              upcomingCollections.map((collection) => (
+                <div
+                  key={collection.id}
+                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  <div className="flex items-center space-x-4">
+                    <div className="flex-shrink-0">
+                      <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center">
+                        <Calendar className="h-6 w-6 text-blue-600" />
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-900">
+                        {collection.farmers.full_name}
+                      </h3>
+                      <p className="text-sm text-gray-500">
+                        {formatDateTime(collection.scheduled_date, collection.scheduled_time)}
+                      </p>
+                      {collection.notes && (
+                        <p className="text-sm text-gray-500 mt-1">{collection.notes}</p>
+                      )}
+                    </div>
+                  </div>
+                  <CollectionRecorder collection={collection} onSuccess={fetchCollections} />
+                </div>
+              ))
+            )
+          ) : completedCollections.length === 0 ? (
+            <p className="text-center text-gray-500 py-4">No completed collections.</p>
           ) : (
-            collections.map((collection) => (
+            completedCollections.map((collection) => (
               <div
                 key={collection.id}
-                className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
               >
                 <div className="flex items-center space-x-4">
                   <div className="flex-shrink-0">
-                    <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center">
-                      <Calendar className="h-6 w-6 text-blue-600" />
+                    <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center">
+                      <Droplet className="h-6 w-6 text-green-600" />
                     </div>
                   </div>
                   <div>
                     <h3 className="text-sm font-medium text-gray-900">
-                      {(collection.farmers as any).full_name}
+                      {collection.farmers.full_name}
                     </h3>
                     <p className="text-sm text-gray-500">
                       {formatDateTime(collection.scheduled_date, collection.scheduled_time)}
+                    </p>
+                    <p className="text-sm font-medium text-green-600 mt-1">
+                      {collection.quantity_liters} liters collected
                     </p>
                     {collection.notes && (
                       <p className="text-sm text-gray-500 mt-1">{collection.notes}</p>
                     )}
                   </div>
                 </div>
-                <span
-                  className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    collection.status === 'completed'
-                      ? 'bg-green-100 text-green-800'
-                      : collection.status === 'cancelled'
-                      ? 'bg-red-100 text-red-800'
-                      : 'bg-yellow-100 text-yellow-800'
-                  }`}
-                >
-                  {collection.status.charAt(0).toUpperCase() + collection.status.slice(1)}
+                <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                  Completed
                 </span>
               </div>
             ))
@@ -303,7 +364,7 @@ const CollectionScheduler = () => {
               </button>
             </div>
 
-            <div className="space-y-2">
+            <div className="mt-4 space-y-2">
               {farmers.map((farmer) => (
                 <button
                   key={farmer.id}
@@ -311,10 +372,9 @@ const CollectionScheduler = () => {
                     setSelectedFarmer(farmer);
                     setIsModalOpen(false);
                   }}
-                  className="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full text-left px-4 py-2 hover:bg-gray-100 rounded-lg"
                 >
-                  <div className="font-medium text-gray-900">{farmer.full_name}</div>
-                  <div className="text-sm text-gray-500">{farmer.location}</div>
+                  {farmer.full_name}
                 </button>
               ))}
             </div>
