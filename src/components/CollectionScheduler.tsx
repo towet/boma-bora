@@ -24,7 +24,8 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({ isOpen, onClose, onSucces
   const [formData, setFormData] = useState({
     scheduled_date: '',
     scheduled_time: '',
-    notes: ''
+    notes: '',
+    quantity_liters: ''
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -40,6 +41,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({ isOpen, onClose, onSucces
         scheduled_date: formData.scheduled_date,
         scheduled_time: formData.scheduled_time,
         notes: formData.notes || null,
+        quantity_liters: formData.quantity_liters ? parseFloat(formData.quantity_liters) : null,
         created_by: user.id,
         status: 'scheduled'
       });
@@ -49,7 +51,8 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({ isOpen, onClose, onSucces
       setFormData({
         scheduled_date: '',
         scheduled_time: '',
-        notes: ''
+        notes: '',
+        quantity_liters: ''
       });
       onSuccess();
       onClose();
@@ -114,6 +117,27 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({ isOpen, onClose, onSucces
                 required
               />
               <Clock className="absolute right-3 top-2 h-5 w-5 text-gray-400" />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="quantity_liters" className="block text-sm font-medium text-gray-700">
+              Expected Quantity (Liters)
+            </label>
+            <div className="mt-1 relative">
+              <input
+                type="number"
+                id="quantity_liters"
+                min="0"
+                step="0.1"
+                value={formData.quantity_liters}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, quantity_liters: e.target.value }))
+                }
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                placeholder="Enter expected quantity in liters"
+              />
+              <Droplet className="absolute right-3 top-2 h-5 w-5 text-gray-400" />
             </div>
           </div>
 

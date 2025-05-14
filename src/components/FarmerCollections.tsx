@@ -49,17 +49,44 @@ const FarmerCollections = () => {
     if (!user) return;
 
     try {
-      const { data, error } = await supabase
+      // Get completed collections for historical data
+      const { data: completedData, error: completedError } = await supabase
         .from('collections')
         .select('quantity_liters')
         .eq('farmer_id', user.id)
         .eq('status', 'completed');
 
-      if (error) throw error;
+      if (completedError) throw completedError;
 
-      const totalLiters = data.reduce((sum, col) => sum + (col.quantity_liters || 0), 0);
-      const totalCollections = data.length;
-      const averageLiters = totalCollections > 0 ? totalLiters / totalCollections : 0;
+      // Get scheduled collections for expected data
+      const { data: scheduledData, error: scheduledError } = await supabase
+        .from('collections')
+        .select('quantity_liters')
+        .eq('farmer_id', user.id)
+        .eq('status', 'scheduled');
+
+      if (scheduledError) throw scheduledError;
+
+      // Calculate stats from completed collections
+      const totalCompletedLiters = completedData.reduce((sum, col) => sum + (col.quantity_liters || 0), 0);
+      const totalCompletedCollections = completedData.length;
+      const averageCompletedLiters = totalCompletedCollections > 0 ? totalCompletedLiters / totalCompletedCollections : 0;
+      
+      // Calculate expected liters from scheduled collections
+      const totalExpectedLiters = scheduledData.reduce((sum, col) => sum + (col.quantity_liters || 0), 0);
+      const totalScheduledCollections = scheduledData.length;
+      
+      // Calculate total collections (completed + scheduled)
+      const totalCollections = totalCompletedCollections + totalScheduledCollections;
+      
+      // Display both completed and expected liters
+      const totalLiters = totalCompletedLiters + totalExpectedLiters;
+      
+      // Average is based on all collections with quantity specified
+      const collectionsWithQuantity = [...completedData, ...scheduledData].filter(col => col.quantity_liters);
+      const averageLiters = collectionsWithQuantity.length > 0 
+        ? collectionsWithQuantity.reduce((sum, col) => sum + (col.quantity_liters || 0), 0) / collectionsWithQuantity.length 
+        : 0;
 
       setStats({
         totalLiters,
@@ -133,6 +160,7 @@ const FarmerCollections = () => {
             <div className="ml-4">
               <h3 className="text-lg font-medium text-gray-900">Total Milk</h3>
               <p className="text-2xl font-semibold text-blue-600">{stats.totalLiters.toFixed(1)} L</p>
+              <p className="text-xs text-gray-500">(includes expected quantities)</p>
             </div>
           </div>
         </div>
@@ -198,6 +226,14 @@ const FarmerCollections = () => {
                         {formatDateTime(collection.scheduled_date, collection.scheduled_time)}
                       </p>
                     </div>
+                    {collection.quantity_liters && (
+                      <div className="flex items-center space-x-1 mt-1">
+                        <Droplet className="h-4 w-4 text-blue-500" />
+                        <p className="text-sm font-medium text-blue-800">
+                          Expected: {collection.quantity_liters} liters
+                        </p>
+                      </div>
+                    )}
                     {collection.notes && (
                       <p className="mt-1 text-sm text-blue-700">{collection.notes}</p>
                     )}
